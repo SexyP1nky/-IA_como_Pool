@@ -1,2 +1,8 @@
-# -IA-como-Pool-N-o-Depend-ncia-S-ncrona-
-Integrantes:  Ruanderson Gabriel Alves da Silva Costa de fontes Samuel da Silva Ferreira  Leonardo Chianca Braga Mateus Lima Cavalcanti de Albuquerque Yan Feitosa Cláudio Yuri Silva Bezerra de Lima
+# -IA_como_Pool - Poc 4
+Integrantes:
+Ruanderson Gabriel Alves da Silva Costa de fontes
+Yan Feitosa Cláudio
+Mateus Lima Cavalcanti de Albuquerque
+Leonardo Chianca Braga
+Samuel da Silva Ferreira
+Yuri Silva Bezerra de Lima

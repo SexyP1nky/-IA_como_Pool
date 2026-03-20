@@ -1,141 +1,244 @@
 # Projeto Engenharia de Sistemas Distribuídos
 
-## Tema: POC 4 - IA como Pool (Não Dependência Síncrona)
-
-## Integrantes:
-    Ruanderson Gabriel Alves da Silva Costa de fontes
-      Contato: ruanderson.gabriel@academico.ufpb.br
-      Github: ruanderson1
-  
-    Samuel da Silva Ferreira 
-      Contato: bixincorrendo@gmail.com
-      Github: sad611
-    
-    Leonardo Chianca Braga
-      Contato: lchiancab@gmail.com
-      Github: leochianca
-    
-    Mateus Lima Cavalcanti de Albuquerque
-      Contato: mateuslca2020@gmail.com
-      Github: mateuslca
-    
-    Yan Feitosa Cláudio
-      Contato: yanfclaudio2002@gmail.com
-      Github: YanFeitosa
-    
-    Yuri Silva Bezerra de Lima
-      Contato: gbaigbag@gmail.com
-      Github: SexyP1nky
-
-# Padrões Arquiteturais
+## Tema: POC 4 — IA como Pool (Não Dependência Síncrona)
 
 ---
+
+## Integrantes
+
+Ruanderson Gabriel Alves da Silva Costa de Fontes  
+Email: ruanderson.gabriel@academico.ufpb.br  
+GitHub: ruanderson1  
+
+Samuel da Silva Ferreira  
+Email: bixincorrendo@gmail.com  
+GitHub: sad611  
+
+Leonardo Chianca Braga  
+Email: lchiancab@gmail.com  
+GitHub: leochianca  
+
+Mateus Lima Cavalcanti de Albuquerque  
+Email: mateuslca2020@gmail.com  
+GitHub: mateuslca  
+
+Yan Feitosa Cláudio  
+Email: yanfclaudio2002@gmail.com  
+GitHub: YanFeitosa  
+
+Yuri Silva Bezerra de Lima  
+Email: gbaigbag@gmail.com  
+GitHub: SexyP1nky  
+
+---
+
+# 1. Problema
+
+A geração de desafios utilizando Inteligência Artificial depende de APIs externas que podem apresentar:
+
+- alta latência  
+- indisponibilidade  
+- limites de uso (rate limit)  
+
+Se utilizada de forma síncrona, essa dependência compromete diretamente o tempo de resposta e a disponibilidade do sistema.
+
+---
+
+# 2. Objetivo
+
+Construir uma arquitetura distribuída onde:
+
+- a IA não bloqueia o fluxo do usuário  
+- o sistema continua funcionando mesmo com IA indisponível  
+- a entrega de respostas ocorre em baixa latência  
+- a geração de conteúdo é desacoplada do consumo  
+
+---
+
+# 3. Arquitetura Geral
+
+A arquitetura é baseada na separação entre:
+
+- fluxo síncrono (atendimento ao usuário)  
+- fluxo assíncrono (geração de desafios via IA)  
+
+Essa separação garante resiliência, escalabilidade e baixo acoplamento.
+
+---
+
+# 4. Containers (C4 Nível 2 — Descrição)
+
+O sistema é composto pelos seguintes containers:
+
+## API / Challenge Engine
+- Recebe requisições dos usuários  
+- Consulta Redis (pool)  
+- Aplica fallback no PostgreSQL  
+- Retorna resposta em baixa latência  
+
+## Worker / Pool Generator
+- Consome mensagens da fila  
+- Gera desafios via IA  
+- Popula o pool no Redis  
+
+## RabbitMQ
+- Responsável pela fila de processamento  
+- Suporte a retry automático  
+- Dead Letter Queue (DLQ)  
+
+## Redis
+- Armazena desafios já gerados (pool)  
+- Permite respostas rápidas  
+
+## PostgreSQL
+- Base de fallback estático  
+- Garante disponibilidade do sistema  
+
+## LLM API (Externa)
+- Responsável pela geração de desafios via IA  
+
+---
+
+# 5. Fluxo do Sistema
+
+1. Worker consome mensagens do RabbitMQ  
+2. Gera desafios via IA  
+3. Armazena no Redis (pool)  
+4. Usuário solicita desafio  
+5. API consulta:
+   - Redis → resposta imediata  
+   - PostgreSQL → fallback  
+6. Se tudo falhar → HTTP 503  
+
+---
+
+# 6. ADRs (Architecture Decision Records)
+
+## ADR-0001 — Monólito Modular com Worker Assíncrono
+
+Decisão: API e processamento assíncrono no mesmo repositório.  
+Motivo: reduzir complexidade operacional e acelerar entrega.  
+Trade-off: menor escalabilidade comparado a microsserviços completos.  
+
+---
+
+## ADR-001 — Uso de RabbitMQ para Mensageria
+
+Decisão: utilização de RabbitMQ.  
+Motivo: suporte a retry e DLQ.  
+Benefício: confiabilidade no processamento assíncrono.  
+Trade-off: ausência de replay nativo de eventos.  
+
+---
+
+## ADR-002 — Estratégia de Fallback com PostgreSQL
+
+Decisão: uso de base estática como fallback.  
+Motivo: garantir disponibilidade mesmo sem IA.  
+Benefício: sistema resiliente.  
+Trade-off: menor variedade de conteúdo.  
+
+---
+
+# 7. Padrões Arquiteturais
 
 ## Circuit Breaker
-**Onde:** Pool Generator → LLM API
-
-A LLM API é externa e pode cair ou ficar lenta. Sem proteção, workers do Celery ficariam
-travados esperando timeout, esgotando o pool no Redis. O Circuit Breaker monitora falhas
-consecutivas e, ao atingir o threshold, para de tentar chamar a API por um período —
-liberando os workers e evitando degradação em cascata.
-
----
+Onde: Pool Generator → LLM API  
+Evita travamento do sistema diante de falhas da IA.
 
 ## Cache-Aside
-**Onde:** Challenge Engine → Redis
-
-O Challenge Engine sempre consulta o Redis antes de qualquer outra fonte. Se o desafio
-está lá, entrega imediatamente. Se não está, cai para o banco estático. Quem popula o
-cache é o Pool Generator em background — o Engine só lê. Isso mantém a entrega rápida
-sem depender da IA no caminho crítico.
-
----
+Onde: Challenge Engine → Redis  
+Permite resposta rápida priorizando o cache.
 
 ## Retry + Dead Letter Queue (DLQ)
-**Onde:** RabbitMQ — falhas de geração
-
-Quando a geração de um desafio falha, a mensagem não é descartada — o RabbitMQ a
-recoloca na fila automaticamente para nova tentativa. Após N tentativas sem sucesso,
-a mensagem vai para a DLQ. Isso garante que nenhuma falha seja silenciosa e permite
-analisar o que causou os erros.
-
----
+Onde: RabbitMQ  
+Permite reprocessamento e isolamento de falhas.
 
 ## Bulkhead / Isolation
-**Onde:** Pool Generator e Challenge Engine como serviços separados
-
-Cada serviço roda em seu próprio container com recursos isolados. Se o Pool Generator
-ficar sobrecarregado processando a fila, isso não consome CPU nem memória do Challenge
-Engine. A separação garante que uma falha em um serviço não afeta o outro.
-
----
+Onde: separação entre API e Worker  
+Evita que falhas em um serviço afetem outro.
 
 ## SYNC vs ASYNC
-**Onde:** geração de desafios (async) vs entrega ao jogador (sync)
-
-Gerar um desafio via LLM pode levar segundos. Entregar ao jogador precisa ser em
-milissegundos. A solução é desacoplar os dois no tempo: o Pool Generator gera em
-background sem ninguém esperando, e o Challenge Engine entrega o que já está pronto
-no Redis. Esse desacoplamento é o argumento central da POC.
-
----
+Onde: arquitetura geral  
+Desacopla geração de conteúdo do tempo de resposta.
 
 ## Load Shedding
-**Onde:** Challenge Engine — último recurso
-
-Se nem Redis nem PostgreSQL estiverem disponíveis, o Engine retorna HTTP 503
-imediatamente em vez de ficar tentando indefinidamente. A decisão de rejeitar
-a requisição de forma explícita e rápida é preferível a travar o serviço inteiro
-sob uma carga que ele não consegue processar.
+Onde: Challenge Engine  
+Retorna erro controlado quando sistema está sobrecarregado.
 
 ---
 
-## Resumo
+# 8. Stack Tecnológico
 
-| Padrão | Onde | Problema que resolve |
-|---|---|---|
-| Circuit Breaker | Pool Generator → LLM API | Evita travar workers quando a IA está fora ou lenta |
-| Cache-Aside | Challenge Engine → Redis | Entrega rápida sem depender da IA no caminho crítico |
-| Retry + DLQ | RabbitMQ | Falhas de geração não são perdidas silenciosamente |
-| Bulkhead / Isolation | Dois serviços separados | Lentidão no Generator não afeta o Engine |
-| SYNC vs ASYNC | Geração vs entrega | Desacopla o tempo de geração do tempo de resposta |
-| Load Shedding | Challenge Engine | Rejeita carga explicitamente quando nada está disponível |
+| Camada | Tecnologia | Justificativa |
+|--------|-----------|--------------|
+| Backend | FastAPI | alta produtividade |
+| Worker | Celery | processamento assíncrono |
+| Mensageria | RabbitMQ | robusto e confiável |
+| Cache | Redis | baixa latência |
+| Banco | PostgreSQL | persistência confiável |
+| IA | API externa (LLM) | geração de conteúdo |
+| Infra | Docker Compose | padronização |
+| CI | GitHub Actions | automação |
 
-# Stack Tecnológico
+---
 
-## Stack escolhido
+# 9. Setup Inicial
 
-### Linguagem
-- Python
-- Motivo: simples, e de fácil adesão ao time.
-- Alternativas: TypeScript (Node.js), Java (Spring).
-- Trade-off: em aplicações muito concorrentes, pode exigir mais cuidado de tuning.
+## Docker Compose
 
-### Framework principal
-- FastAPI
-- Motivo: produtividade alta para APIs, validação com Pydantic e boa documentação automática.
-- Alternativas: Flask, Django Rest Framework.
-- Trade-off: menos estrutura "pronta" que frameworks mais opinativos.
+Serviços definidos:
 
-### Banco de dados
-- PostgreSQL
-- Motivo: estável, conhecido e fácil de subir com Docker.
-- Alternativas: MySQL, SQLite.
-- Trade-off: adiciona mais um serviço no ambiente.
+- api  
+- worker  
+- rabbitmq  
+- redis  
+- postgres  
 
-### Assíncrono (fila/pool)
-- RabbitMQ
-- Motivo: fila robusta e bem estabelecida para processamento assíncrono.
-- Alternativas: Redis + RQ/Celery, job table no banco.
-- Trade-off: operação um pouco mais trabalhosa que Redis puro.
+Objetivo: permitir execução padronizada do sistema localmente.
 
-### Infra e ambiente
-- Docker Compose + GitHub Actions
-- Motivo: padroniza ambiente e garante um CI básico.
-- Alternativa: rodar tudo manualmente em cada máquina.
-- Trade-off: exige configuração inicial.
+---
 
-## Como isso conversa com a arquitetura
+## CI Básico
+
+Pipeline inicial:
+
+1. Instalar dependências  
+2. Executar lint  
+3. Rodar testes unitários  
+4. Realizar build  
+
+---
+
+# 10. Divisão de Responsabilidades
+
+Ruanderson → consolidação da arquitetura  
+Samuel → definição da stack tecnológica  
+Leonardo → setup e infraestrutura  
+Mateus → padrões arquiteturais  
+Yan → revisão técnica dos ADRs  
+Yuri → diagramas C4  
+
+---
+
+# 11. Diferenciais da Arquitetura
+
+- IA desacoplada do fluxo crítico  
+- Sistema resiliente a falhas externas  
+- Uso de fallback inteligente  
+- Baixa latência garantida  
+- Arquitetura simples e escalável  
+
+---
+
+# 12. Conclusão
+
+A arquitetura proposta atende aos requisitos da POC ao garantir:
+
+- disponibilidade  
+- desempenho  
+- resiliência  
+- baixo acoplamento  
 
 - IA fica fora do fluxo crítico.
 - RabbitMQ mantém a fila de processamento assíncrono.

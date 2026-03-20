@@ -27,10 +27,7 @@
       Contato: gbaigbag@gmail.com
       Github: SexyP1nky
 
-# Padrões Arquiteturais — AI Pool System
-
-> POC 4: IA como Pool (Não Dependência Síncrona)
-> Engenharia de Sistemas Distribuídos 2025.2
+# Padrões Arquiteturais
 
 ---
 

@@ -100,3 +100,47 @@ sob uma carga que ele não consegue processar.
 | Bulkhead / Isolation | Dois serviços separados | Lentidão no Generator não afeta o Engine |
 | SYNC vs ASYNC | Geração vs entrega | Desacopla o tempo de geração do tempo de resposta |
 | Load Shedding | Challenge Engine | Rejeita carga explicitamente quando nada está disponível |
+
+# Stack Tecnológico
+
+## Objetivo
+
+Definir, de forma simples, as tecnologias do projeto e o motivo de cada escolha.
+
+## Stack escolhido
+
+### Linguagem
+- Python
+- Motivo: simples, e de fácil adesão ao time.
+- Alternativas: TypeScript (Node.js), Java (Spring).
+- Trade-off: em aplicações muito concorrentes, pode exigir mais cuidado de tuning.
+
+### Framework principal
+- FastAPI
+- Motivo: produtividade alta para APIs, validação com Pydantic e boa documentação automática.
+- Alternativas: Flask, Django Rest Framework.
+- Trade-off: menos estrutura "pronta" que frameworks mais opinativos.
+
+### Banco de dados
+- PostgreSQL
+- Motivo: estável, conhecido e fácil de subir com Docker.
+- Alternativas: MySQL, SQLite.
+- Trade-off: adiciona mais um serviço no ambiente.
+
+### Assíncrono (fila/pool)
+- RabbitMQ
+- Motivo: fila robusta e bem estabelecida para processamento assíncrono.
+- Alternativas: Redis + RQ/Celery, job table no banco.
+- Trade-off: operação um pouco mais trabalhosa que Redis puro.
+
+### Infra e ambiente
+- Docker Compose + GitHub Actions
+- Motivo: padroniza ambiente e garante um CI básico.
+- Alternativa: rodar tudo manualmente em cada máquina.
+- Trade-off: exige configuração inicial.
+
+## Como isso conversa com a arquitetura
+
+- IA fica fora do fluxo crítico.
+- RabbitMQ mantém a fila de processamento assíncrono.
+- Fallback estático mantém funcionamento quando IA/pool falham.

@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "dev"]
+  pull_request:
+    branches: ["main", "dev"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Instalar Ruff
+        run: pip install ruff
+
+      - name: Lint
+        run: ruff check . --output-format=github
+
+      - name: Formato
+        run: ruff format --check .
+
+  test:
+    name: Testes unitários
+    runs-on: ubuntu-22.04
+    needs: lint
+    strategy:
+      matrix:
+        service: [pool-generator, challenge-engine]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Instalar dependências — ${{ matrix.service }}
+        run: |
+          pip install -r services/${{ matrix.service }}/requirements.txt
+          pip install pytest pytest-asyncio
+
+      - name: Rodar testes — ${{ matrix.service }}
+        run: pytest services/${{ matrix.service }}/tests/ -v
+        env:
+          REDIS_URL: redis://localhost:6379/0
+          LLM_API_URL: http://localhost:8080/v1
+          LLM_API_KEY: test-key
+          DATABASE_URL: sqlite+aiosqlite:///:memory:

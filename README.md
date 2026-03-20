@@ -240,4 +240,16 @@ A arquitetura proposta atende aos requisitos da POC ao garantir:
 - resiliência  
 - baixo acoplamento  
 
-Mesmo em cenários de falha da IA, o sistema continua operando de forma previsível.
+- IA fica fora do fluxo crítico.
+- RabbitMQ mantém a fila de processamento assíncrono.
+- Fallback estático mantém funcionamento quando IA/pool falham.
+
+
+---
+
+# Diagrama C4
+## Nível 1 - Contexto
+![nv1](https://github.com/user-attachments/assets/7a7d36e5-51af-4e64-8bfc-7dec88e035d0)
+
+## Nível 2 - Containers
+![nv2](https://github.com/user-attachments/assets/584ca9a2-5bfc-4218-95a1-bd4c81e4a3dd)

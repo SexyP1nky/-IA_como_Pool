@@ -103,10 +103,6 @@ sob uma carga que ele não consegue processar.
 
 # Stack Tecnológico
 
-## Objetivo
-
-Definir, de forma simples, as tecnologias do projeto e o motivo de cada escolha.
-
 ## Stack escolhido
 
 ### Linguagem

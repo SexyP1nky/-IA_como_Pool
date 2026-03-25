@@ -39,5 +39,4 @@ def test_integration_challenge_from_redis_and_postgres():
     Exemplo de teste de integração para o endpoint /challenge.
     Quando as integrações estiverem prontas, remova o skip e implemente mocks reais de Redis/Postgres.
     """
-    # TODO: implementar teste real de integração
     assert True

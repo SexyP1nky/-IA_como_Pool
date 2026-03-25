@@ -1,1 +1,4 @@
-# TODO: definir dependências do challenge-engine
+fastapi
+uvicorn[standard]
+aioredis
+asyncpg

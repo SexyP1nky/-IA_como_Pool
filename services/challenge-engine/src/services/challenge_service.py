@@ -58,13 +58,11 @@ class ChallengeService:
             ChallengeServiceError: Erro no serviço
         """
         try:
-            # Gera o desafio
-            challenge = self.generator.generate(
+            challenge = await self.generator.generate(
                 challenge_type=challenge_type, level=level
             )
             self.logger.info(f"Challenge generated: {challenge.id}")
 
-            # Tenta salvar no Redis (não é bloqueante se falhar)
             if self.redis_client:
                 try:
                     await self.redis_client.push_challenge(challenge)
@@ -74,7 +72,6 @@ class ChallengeService:
                         f"Failed to save challenge to Redis: {str(e)}. "
                         f"Challenge still generated locally."
                     )
-                    # Não propaga o erro - o desafio foi gerado mesmo que Redis falhe
 
             return challenge
 
@@ -106,13 +103,11 @@ class ChallengeService:
             ChallengeServiceError: Erro no serviço
         """
         try:
-            # Gera o lote
-            challenges = self.generator.generate_batch(
+            challenges = await self.generator.generate_batch(
                 count=count, challenge_type=challenge_type
             )
             self.logger.info(f"Batch of {count} challenges generated")
 
-            # Tenta salvar todos no Redis
             if self.redis_client:
                 try:
                     await self.redis_client.push_challenges_batch(challenges)

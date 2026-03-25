@@ -147,7 +147,6 @@ class TestMockRedisClient:
                 challenges.append(challenge)
                 await redis_client.push_challenge(challenge)
 
-            # Recupera na mesma ordem
             for i in range(3):
                 result = await redis_client.get_challenge()
                 data = json.loads(result)

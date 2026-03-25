@@ -3,13 +3,17 @@ Challenge Generator Module
 
 Módulo responsável por gerar desafios de programação.
 Implementa diferentes tipos de desafios e mantém a geração modular e extensível.
+Suporta geração via LLM (Gemini, Mock) com fallback para pool pré-definido.
 """
 import logging
 import uuid
+import os
 from dataclasses import dataclass, asdict
 from enum import Enum
 from typing import Dict, Any, Optional
 from datetime import datetime
+
+from src.llm.provider import LLMProvider, CircuitBreaker, LLMError
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +61,6 @@ class ChallengeGenerationError(Exception):
 class ChallengeGenerator:
     """Gerador de desafios de programação."""
 
-    # Pool de desafios pré-definidos para geração rápida
     CHALLENGE_POOL = {
         ChallengeType.ALGORITHM: [
             {
@@ -123,18 +126,62 @@ class ChallengeGenerator:
         ],
     }
 
-    def __init__(self):
-        """Inicializa o gerador de desafios."""
+    def __init__(
+        self,
+        llm_provider: Optional[LLMProvider] = None,
+        enable_llm: bool = True,
+    ):
+        """
+        Inicializa o gerador de desafios.
+
+        Args:
+            llm_provider: Provedor LLM (ou detecta automaticamente)
+            enable_llm: Se deve usar LLM em vez de pool pré-definido
+        """
         self.logger = logging.getLogger(__name__)
+        self.enable_llm = enable_llm
+
+        if enable_llm and os.getenv("ENABLE_LLM", "true").lower() == "true":
+            if llm_provider:
+                self.llm_provider = llm_provider
+            else:
+                try:
+                    provider_name = os.getenv("LLM_PROVIDER", "gemini").strip().lower()
+
+                    if provider_name == "groq":
+                        from src.llm.groq_provider import GroqLLMProvider
+
+                        self.llm_provider = GroqLLMProvider()
+                        self.logger.info("LLM: Groq inicializado")
+                    else:
+                        from src.llm.gemini_provider import GeminiLLMProvider
+
+                        self.llm_provider = GeminiLLMProvider()
+                        self.logger.info("LLM: Google Gemini inicializado")
+                except (LLMError, ImportError) as e:
+                    self.logger.warning(f"LLM indisponível ({str(e)}), usando Mock")
+                    from src.llm.mock_provider import MockLLMProvider
+
+                    self.llm_provider = MockLLMProvider()
+
+            from src.llm.mock_provider import MockLLMProvider
+            self.fallback_provider = MockLLMProvider()
+            self.circuit_breaker = CircuitBreaker(failure_threshold=3)
+        else:
+            self.llm_provider = None
+            self.fallback_provider = None
+            self.circuit_breaker = None
+            self.enable_llm = False
+
         self.logger.info("ChallengeGenerator initialized")
 
-    def generate(
+    async def generate(
         self,
         challenge_type: Optional[ChallengeType] = None,
         level: Optional[ChallengeLevel] = None,
     ) -> Challenge:
         """
-        Gera um novo desafio.
+        Gera um novo desafio usando LLM se disponível, senão pool pré-definido.
 
         Args:
             challenge_type: Tipo de desafio (ou aleatório se None)
@@ -147,32 +194,64 @@ class ChallengeGenerator:
             ChallengeGenerationError: Erro durante a geração
         """
         try:
-            # Se tipo não especificado, escolhe aleatoriamente
             if challenge_type is None:
                 challenge_type = self._random_type()
 
-            # Valida o tipo
+            if level is None:
+                level = self._random_level()
+
+            if self.enable_llm and self.circuit_breaker and self.llm_provider:
+                try:
+                    challenge_data = await self.circuit_breaker.call_with_fallback(
+                        self.llm_provider.generate_challenge,
+                        self.fallback_provider.generate_challenge,
+                        challenge_type.value,
+                        level.value,
+                    )
+                    source = challenge_data.pop("_llm_source", "llm")
+
+                    challenge = Challenge(
+                        id=str(uuid.uuid4()),
+                        type=challenge_type,
+                        level=level,
+                        title=challenge_data["title"],
+                        description=challenge_data["description"],
+                        example_input=challenge_data["example_input"],
+                        example_output=challenge_data["example_output"],
+                        created_at=datetime.utcnow().isoformat(),
+                        metadata={
+                            "generator_version": "2.0",
+                            "source": source,
+                        },
+                    )
+
+                    self.logger.info(
+                        f"Challenge generated: id={challenge.id}, type={challenge.type}, "
+                        f"level={challenge.level}, source={challenge.metadata['source']}"
+                    )
+                    return challenge
+
+                except Exception as e:
+                    self.logger.warning(
+                        f"LLM generation failed: {str(e)}, falling back to pool"
+                    )
+
             if challenge_type not in self.CHALLENGE_POOL:
                 raise ChallengeGenerationError(
                     f"Challenge type '{challenge_type}' not available"
                 )
 
-            # Obtem o desafio do pool
             challenges = self.CHALLENGE_POOL[challenge_type]
 
-            # Filtra por nível se especificado
-            if level is not None:
-                challenges = [c for c in challenges if c["level"] == level]
-                if not challenges:
-                    raise ChallengeGenerationError(
-                        f"No challenge available for type={challenge_type}, level={level}"
-                    )
+            challenges = [c for c in challenges if c["level"] == level]
+            if not challenges:
+                raise ChallengeGenerationError(
+                    f"No challenge available for type={challenge_type}, level={level}"
+                )
 
-            # Seleciona aleatoriamente um desafio
             import random
             challenge_data = random.choice(challenges)
 
-            # Cria objeto Challenge
             challenge = Challenge(
                 id=str(uuid.uuid4()),
                 type=challenge_type,
@@ -183,13 +262,13 @@ class ChallengeGenerator:
                 example_output=challenge_data["example_output"],
                 created_at=datetime.utcnow().isoformat(),
                 metadata={
-                    "generator_version": "1.0",
+                    "generator_version": "2.0",
                     "source": "pool",
                 },
             )
 
             self.logger.info(
-                f"Challenge generated: id={challenge.id}, type={challenge.type}, level={challenge.level}"
+                f"Challenge generated (fallback): id={challenge.id}, type={challenge.type}, level={challenge.level}"
             )
             return challenge
 
@@ -200,7 +279,7 @@ class ChallengeGenerator:
             self.logger.error(error_msg)
             raise ChallengeGenerationError(error_msg) from e
 
-    def generate_batch(
+    async def generate_batch(
         self, count: int = 10, challenge_type: Optional[ChallengeType] = None
     ) -> list[Challenge]:
         """
@@ -225,7 +304,7 @@ class ChallengeGenerator:
         try:
             challenges = []
             for _ in range(count):
-                challenge = self.generate(challenge_type=challenge_type)
+                challenge = await self.generate(challenge_type=challenge_type)
                 challenges.append(challenge)
 
             self.logger.info(f"Generated batch of {count} challenges")
@@ -243,6 +322,12 @@ class ChallengeGenerator:
         """Seleciona um tipo aleatório de desafio."""
         import random
         return random.choice(list(ChallengeType))
+
+    @staticmethod
+    def _random_level() -> ChallengeLevel:
+        """Seleciona um nível aleatório de dificuldade."""
+        import random
+        return random.choice(list(ChallengeLevel))
 
     @staticmethod
     def get_available_types() -> list[str]:

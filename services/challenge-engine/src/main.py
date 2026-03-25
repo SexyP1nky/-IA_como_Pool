@@ -14,15 +14,15 @@ Módulos principais:
 	- src/services/challenge_service.py: orquestração de geração + Redis
 """
 import logging
+import os
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import JSONResponse
 
-from src.integrations.redis import get_challenge_from_redis
+from src.integrations.redis import get_challenge_from_redis, RedisClientImpl
 from src.integrations.postgres import get_challenge_from_postgres
 from src.services.challenge_service import ChallengeService, ChallengeServiceError
 from src.generators.challenge_generator import ChallengeType, ChallengeLevel
 
-# Configurar logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -35,8 +35,45 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# Inicializar serviço
-challenge_service = ChallengeService(redis_client=None)  # Redis mockado por enquanto
+challenge_service: ChallengeService | None = None
+redis_client: RedisClientImpl | None = None
+
+
+def get_challenge_service() -> ChallengeService:
+	"""Recupera instância ativa do serviço."""
+	global challenge_service
+	if challenge_service is None:
+		challenge_service = ChallengeService(redis_client=None)
+	return challenge_service
+
+
+@app.on_event("startup")
+async def startup_event():
+	"""Inicializa conexões externas no startup."""
+	global challenge_service, redis_client
+
+	redis_client = RedisClientImpl(
+		host=os.getenv("REDIS_HOST", "localhost"),
+		port=int(os.getenv("REDIS_PORT", "6379")),
+		db=int(os.getenv("REDIS_DB", "0")),
+		key=os.getenv("REDIS_KEY", "challenge_pool"),
+	)
+
+	try:
+		await redis_client.connect()
+		challenge_service = ChallengeService(redis_client=redis_client)
+		logger.info("ChallengeService iniciado com Redis")
+	except Exception as e:
+		logger.warning(f"Redis indisponível no startup ({str(e)}), iniciando sem Redis")
+		challenge_service = ChallengeService(redis_client=None)
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+	"""Fecha conexões no encerramento da API."""
+	global redis_client
+	if redis_client:
+		await redis_client.close()
 
 
 @app.get("/health")
@@ -54,17 +91,14 @@ async def get_challenge():
 	2. Fallback: busca no PostgreSQL
 	3. Se não houver disponível, retorna erro 503
 	"""
-	# 1. Tenta buscar no Redis
 	challenge = await get_challenge_from_redis()
 	if challenge:
 		return JSONResponse(content={"challenge": challenge, "source": "pool"})
 
-	# 2. Fallback: busca no PostgreSQL
 	challenge = await get_challenge_from_postgres()
 	if challenge:
 		return JSONResponse(content={"challenge": challenge, "source": "static_fallback"})
 
-	# 3. Se não houver desafio disponível
 	raise HTTPException(status_code=503, detail="No challenge available.")
 
 
@@ -88,7 +122,7 @@ async def generate_challenge(
 		}
 	"""
 	try:
-		# Converter strings de Query para enums
+		svc = get_challenge_service()
 		challenge_type_enum = None
 		if challenge_type:
 			try:
@@ -96,7 +130,7 @@ async def generate_challenge(
 			except ValueError:
 				raise HTTPException(
 					status_code=400,
-					detail=f"Invalid challenge_type. Must be one of: {', '.join(ChallengeType.get_available_types())}",
+					detail="Invalid challenge_type. Must be one of: algorithm, string_manipulation, math",
 				)
 
 		level_enum = None
@@ -106,11 +140,10 @@ async def generate_challenge(
 			except ValueError:
 				raise HTTPException(
 					status_code=400,
-					detail=f"Invalid level. Must be one of: {', '.join(ChallengeLevel.get_available_levels())}",
+					detail="Invalid level. Must be one of: easy, medium, hard",
 				)
 
-		# Gera e salva
-		challenge = await challenge_service.generate_and_save(
+		challenge = await svc.generate_and_save(
 			challenge_type=challenge_type_enum,
 			level=level_enum,
 		)
@@ -155,7 +188,7 @@ async def generate_batch(
 		}
 	"""
 	try:
-		# Converter tipo se especificado
+		svc = get_challenge_service()
 		challenge_type_enum = None
 		if challenge_type:
 			try:
@@ -163,11 +196,10 @@ async def generate_batch(
 			except ValueError:
 				raise HTTPException(
 					status_code=400,
-					detail=f"Invalid challenge_type. Must be one of: {', '.join(ChallengeType.get_available_types())}",
+					detail="Invalid challenge_type. Must be one of: algorithm, string_manipulation, math",
 				)
 
-		# Gera lote
-		challenges = await challenge_service.generate_and_save_batch(
+		challenges = await svc.generate_and_save_batch(
 			count=count,
 			challenge_type=challenge_type_enum,
 		)
@@ -195,9 +227,10 @@ async def generate_batch(
 @app.get("/challenge/types")
 async def get_challenge_types():
 	"""Retorna os tipos de desafios disponíveis."""
+	svc = get_challenge_service()
 	return JSONResponse(
 		content={
-			"types": challenge_service.get_available_types(),
+			"types": svc.get_available_types(),
 		}
 	)
 
@@ -205,8 +238,9 @@ async def get_challenge_types():
 @app.get("/challenge/levels")
 async def get_challenge_levels():
 	"""Retorna os níveis de dificuldade disponíveis."""
+	svc = get_challenge_service()
 	return JSONResponse(
 		content={
-			"levels": challenge_service.get_available_levels(),
+			"levels": svc.get_available_levels(),
 		}
 	)

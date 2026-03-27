@@ -8,8 +8,7 @@ Cobre:
 - Integração com Redis
 """
 import pytest
-import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 from src.services.challenge_service import (
     ChallengeService,

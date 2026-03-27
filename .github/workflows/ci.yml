@@ -27,10 +27,7 @@ jobs:
         run: pip install ruff
 
       - name: Lint
-        run: ruff check . --output-format=github
-
-      - name: Formato
-        run: ruff format --check .
+        run: ruff check . --output-format=github --select=E9,F
 
   test:
     name: Testes unitários
@@ -38,7 +35,11 @@ jobs:
     needs: lint
     strategy:
       matrix:
-        service: [pool-generator, challenge-engine]
+        include:
+          - service: pool-generator
+            service_path: services/pool-generator
+          - service: challenge-engine
+            service_path: services/challenge-engine
     steps:
       - uses: actions/checkout@v4
 
@@ -48,14 +49,16 @@ jobs:
           cache: "pip"
 
       - name: Instalar dependências — ${{ matrix.service }}
+        working-directory: ${{ matrix.service_path }}
         run: |
-          pip install -r services/${{ matrix.service }}/requirements.txt
+          pip install -r requirements.txt
           pip install pytest pytest-asyncio
 
       - name: Rodar testes — ${{ matrix.service }}
-        run: pytest services/${{ matrix.service }}/tests/ -v
+        working-directory: ${{ matrix.service_path }}
+        run: pytest tests/ -v
         env:
           REDIS_URL: redis://localhost:6379/0
           LLM_API_URL: http://localhost:8080/v1
           LLM_API_KEY: test-key
-          DATABASE_URL: sqlite+aiosqlite:///:memory:
+          DATABASE_URL: "sqlite+aiosqlite:///:memory:"

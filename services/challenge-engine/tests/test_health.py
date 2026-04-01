@@ -47,9 +47,7 @@ def test_health_with_redis_connected():
 
 def test_health_with_redis_and_pool():
     mock_redis = MockRedisClient()
-    asyncio.get_event_loop().run_until_complete(
-        mock_redis.push_challenge(_make_challenge())
-    )
+    asyncio.run(mock_redis.push_challenge(_make_challenge()))
     main_module.redis_client = mock_redis
     response = client.get("/health")
     data = response.json()
@@ -72,9 +70,7 @@ def test_health_without_redis():
 @patch("src.main.get_challenge_from_postgres", new_callable=AsyncMock)
 def test_challenge_from_redis(mock_postgres):
     mock_redis = MockRedisClient()
-    asyncio.get_event_loop().run_until_complete(
-        mock_redis.push_challenge(_make_challenge())
-    )
+    asyncio.run(mock_redis.push_challenge(_make_challenge()))
     main_module.redis_client = mock_redis
     mock_postgres.return_value = None
 

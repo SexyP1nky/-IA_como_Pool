@@ -1,6 +1,6 @@
 fastapi
 uvicorn[standard]
-aioredis
+redis[hiredis]
 asyncpg
 pytest
 pytest-asyncio

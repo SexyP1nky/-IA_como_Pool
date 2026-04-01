@@ -87,6 +87,7 @@ services:
       - "8000:8000"
     environment:
       REDIS_URL: redis://redis:6379/0
+      REDIS_KEY: challenge_pool
       DATABASE_URL: postgresql+asyncpg://ai_pool_user:ai_pool_pass@postgres:5432/ai_pool
       POOL_MIN_SIZE: ${POOL_MIN_SIZE:-10}
     depends_on:

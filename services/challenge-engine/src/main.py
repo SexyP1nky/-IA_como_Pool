@@ -14,11 +14,10 @@ Módulos principais:
 	- src/services/challenge_service.py: orquestração de geração + Redis
 """
 import logging
-import os
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import JSONResponse
 
-from src.integrations.redis import get_challenge_from_redis, RedisClientImpl
+from src.integrations.redis import RedisClientImpl
 from src.integrations.postgres import get_challenge_from_postgres
 from src.services.challenge_service import ChallengeService, ChallengeServiceError
 from src.generators.challenge_generator import ChallengeType, ChallengeLevel
@@ -52,19 +51,14 @@ async def startup_event():
 	"""Inicializa conexões externas no startup."""
 	global challenge_service, redis_client
 
-	redis_client = RedisClientImpl(
-		host=os.getenv("REDIS_HOST", "localhost"),
-		port=int(os.getenv("REDIS_PORT", "6379")),
-		db=int(os.getenv("REDIS_DB", "0")),
-		key=os.getenv("REDIS_KEY", "challenge_pool"),
-	)
+	redis_client = RedisClientImpl.from_env()
 
 	try:
 		await redis_client.connect()
 		challenge_service = ChallengeService(redis_client=redis_client)
 		logger.info("ChallengeService iniciado com Redis")
 	except Exception as e:
-		logger.warning(f"Redis indisponível no startup ({str(e)}), iniciando sem Redis")
+		logger.warning(f"Redis indisponível no startup ({e}), iniciando sem Redis")
 		challenge_service = ChallengeService(redis_client=None)
 
 
@@ -87,11 +81,17 @@ async def get_challenge():
 	"""
 	Busca um desafio pronto no pool.
 	
-	1. Tenta buscar no Redis
+	1. Tenta buscar no Redis (via client persistente)
 	2. Fallback: busca no PostgreSQL
 	3. Se não houver disponível, retorna erro 503
 	"""
-	challenge = await get_challenge_from_redis()
+	challenge = None
+	if redis_client:
+		try:
+			challenge = await redis_client.get_challenge()
+		except Exception as e:
+			logger.warning(f"Redis read failed: {e}")
+
 	if challenge:
 		return JSONResponse(content={"challenge": challenge, "source": "pool"})
 

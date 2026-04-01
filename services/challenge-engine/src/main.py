@@ -51,14 +51,14 @@ async def startup_event():
 	"""Inicializa conexões externas no startup."""
 	global challenge_service, redis_client
 
-	redis_client = RedisClientImpl.from_env()
-
 	try:
+		redis_client = RedisClientImpl.from_env()
 		await redis_client.connect()
 		challenge_service = ChallengeService(redis_client=redis_client)
 		logger.info("ChallengeService iniciado com Redis")
 	except Exception as e:
 		logger.warning(f"Redis indisponível no startup ({e}), iniciando sem Redis")
+		redis_client = None
 		challenge_service = ChallengeService(redis_client=None)
 
 

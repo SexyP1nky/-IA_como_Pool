@@ -8,7 +8,6 @@ import logging
 import os
 from typing import Optional
 from abc import ABC, abstractmethod
-from urllib.parse import urlparse
 
 from src.generators.challenge_generator import Challenge
 
@@ -63,22 +62,21 @@ class RedisClientImpl(RedisClient):
         port: int = DEFAULT_REDIS_PORT,
         db: int = DEFAULT_REDIS_DB,
         key: str = DEFAULT_REDIS_KEY,
+        *,
+        url: Optional[str] = None,
     ):
         self.host = host
         self.port = port
         self.db = db
         self.key = key
+        self._url = url
         self.redis = None
         self.logger = logging.getLogger(__name__)
 
     @classmethod
     def from_url(cls, url: str, key: str = DEFAULT_REDIS_KEY) -> "RedisClientImpl":
-        """Cria instância a partir de uma URL redis:// completa."""
-        parsed = urlparse(url)
-        host = parsed.hostname or DEFAULT_REDIS_HOST
-        port = parsed.port or DEFAULT_REDIS_PORT
-        db = int(parsed.path.lstrip("/") or DEFAULT_REDIS_DB)
-        return cls(host=host, port=port, db=db, key=key)
+        """Cria instância preservando a URL original (auth, rediss://, query params)."""
+        return cls(key=key, url=url)
 
     @classmethod
     def from_env(cls) -> "RedisClientImpl":
@@ -102,16 +100,22 @@ class RedisClientImpl(RedisClient):
         try:
             import redis.asyncio as aioredis
 
-            self.redis = aioredis.Redis(
-                host=self.host,
-                port=self.port,
-                db=self.db,
-                decode_responses=True,
-            )
+            if self._url:
+                self.redis = aioredis.Redis.from_url(
+                    self._url, decode_responses=True,
+                )
+                label = self._url.split("@")[-1] if "@" in self._url else self._url
+            else:
+                self.redis = aioredis.Redis(
+                    host=self.host,
+                    port=self.port,
+                    db=self.db,
+                    decode_responses=True,
+                )
+                label = f"{self.host}:{self.port}/{self.db}"
+
             await self.redis.ping()
-            self.logger.info(
-                f"Connected to Redis at {self.host}:{self.port}/{self.db}"
-            )
+            self.logger.info(f"Connected to Redis at {label}")
         except Exception as e:
             self.redis = None
             error_msg = f"Failed to connect to Redis: {e}"

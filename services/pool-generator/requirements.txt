@@ -1,1 +1,3 @@
-# TODO: definir dependências do pool-generator
+redis[hiredis]
+celery
+python-dotenv

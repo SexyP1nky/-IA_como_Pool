@@ -72,8 +72,27 @@ async def shutdown_event():
 
 @app.get("/health")
 async def health():
-	"""Endpoint de health check."""
-	return JSONResponse(content={"status": "healthy"})
+	"""Health check com status real das dependências."""
+	redis_ok = False
+	pool_size = 0
+
+	if redis_client:
+		try:
+			redis_ok = await redis_client.ping()
+			if redis_ok:
+				pool_size = await redis_client.get_pool_size()
+		except Exception:
+			redis_ok = False
+
+	status = "healthy" if redis_ok else "degraded"
+
+	return JSONResponse(content={
+		"status": status,
+		"redis": {
+			"connected": redis_ok,
+			"pool_size": pool_size,
+		},
+	})
 
 
 @app.get("/challenge")

@@ -3,6 +3,7 @@ Integração com Redis para o pool de desafios.
 
 Usa redis-py (redis.asyncio) como cliente async.
 """
+
 import json
 import logging
 import os
@@ -21,6 +22,7 @@ DEFAULT_REDIS_DB = 0
 
 class RedisConnectionError(Exception):
     """Erro de conexão com Redis."""
+
     pass
 
 
@@ -102,7 +104,8 @@ class RedisClientImpl(RedisClient):
 
             if self._url:
                 self.redis = aioredis.Redis.from_url(
-                    self._url, decode_responses=True,
+                    self._url,
+                    decode_responses=True,
                 )
                 label = self._url.split("@")[-1] if "@" in self._url else self._url
             else:

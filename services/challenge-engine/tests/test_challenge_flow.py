@@ -1,5 +1,5 @@
-#Valida o fluxo completo de requisição através das camadas do sistema,
-#garantindo que os padrões arquiteturais estão corretamente implementados:
+# Valida o fluxo completo de requisição através das camadas do sistema,
+# garantindo que os padrões arquiteturais estão corretamente implementados:
 #
 #  - Cache-Aside (Redis como fonte primária)
 #  - Fallback (PostgreSQL como fonte secundária)
@@ -8,7 +8,7 @@
 #  - Prioridade de fontes (Redis SEMPRE antes do PostgreSQL)
 #  - Resiliência a múltiplas requisições consecutivas
 
-#Uso:
+# Uso:
 #   # A partir do diretório services/challenge-engine
 #   python -m pytest test_challenge_flow.py -v
 
@@ -43,6 +43,7 @@ def _make_redis_mock(challenge_value):
 # Fluxo 1 — GET /challenge com Redis disponível
 # Padrão validado: Cache-Aside
 
+
 class TestFluxoRedisDisponivel:
     """Redis tem desafios prontos → deve retorná-los sem chamar o PostgreSQL."""
 
@@ -53,12 +54,16 @@ class TestFluxoRedisDisponivel:
         Resultado esperado: HTTP 200, source='pool'.
         """
         mock_pg.return_value = None
-        redis_mock = _make_redis_mock(json.dumps({
-            "id": "abc-123",
-            "title": "Two Sum",
-            "type": "algorithm",
-            "level": "easy",
-        }))
+        redis_mock = _make_redis_mock(
+            json.dumps(
+                {
+                    "id": "abc-123",
+                    "title": "Two Sum",
+                    "type": "algorithm",
+                    "level": "easy",
+                }
+            )
+        )
 
         with patch.object(main_module, "redis_client", redis_mock):
             resp = client.get("/challenge")
@@ -70,9 +75,9 @@ class TestFluxoRedisDisponivel:
 
     @patch("src.main.get_challenge_from_postgres", new_callable=AsyncMock)
     def test_postgres_nao_e_chamado_quando_redis_responde(self, mock_pg):
-        
-        #Padrão Cache-Aside: se Redis responde, o PostgreSQL NUNCA deve ser consultado.
-        
+
+        # Padrão Cache-Aside: se Redis responde, o PostgreSQL NUNCA deve ser consultado.
+
         mock_pg.return_value = "desafio do postgres"
         redis_mock = _make_redis_mock("desafio do redis")
 
@@ -87,6 +92,7 @@ class TestFluxoRedisDisponivel:
 # Fluxo 2 — GET /challenge com Redis vazio → fallback para PostgreSQL
 # Padrão validado: Fallback
 
+
 class TestFluxoFallbackPostgres:
     """Redis vazio → deve tentar PostgreSQL como fallback."""
 
@@ -96,11 +102,13 @@ class TestFluxoFallbackPostgres:
         Cenário: Redis vazio, PostgreSQL com dados.
         Resultado esperado: HTTP 200, source='static_fallback'.
         """
-        mock_pg.return_value = json.dumps({
-            "id": "static-001",
-            "title": "Fibonacci Sequence",
-            "type": "algorithm",
-        })
+        mock_pg.return_value = json.dumps(
+            {
+                "id": "static-001",
+                "title": "Fibonacci Sequence",
+                "type": "algorithm",
+            }
+        )
         redis_mock = _make_redis_mock(None)  # Redis vazio
 
         with patch.object(main_module, "redis_client", redis_mock):
@@ -141,6 +149,7 @@ class TestFluxoFallbackPostgres:
 
 # Fluxo 3 — GET /challenge sem nenhuma fonte disponível
 # Padrão validado: Load Shedding (503)
+
 
 class TestFluxoLoadShedding:
     """Redis e PostgreSQL vazios → deve retornar 503."""
@@ -187,6 +196,7 @@ class TestFluxoLoadShedding:
 
 # Fluxo 4 — Ciclo completo: geração → pool → consumo
 # Padrão validado: Cache-Aside + FIFO Queue
+
 
 class TestFluxoGeracaoEConsumo:
     """Valida o ciclo completo: ChallengeService gera e salva; Redis entrega."""
@@ -262,6 +272,7 @@ class TestFluxoGeracaoEConsumo:
 
 # Fluxo 5 — Prioridade de fontes
 
+
 class TestPrioridadeDeFontes:
     """Valida a hierarquia: Redis > PostgreSQL > 503."""
 
@@ -296,13 +307,14 @@ class TestPrioridadeDeFontes:
         with patch.object(main_module, "redis_client", redis_mock):
             respostas = [client.get("/challenge") for _ in range(4)]
 
-        assert respostas[0].json()["source"] == "pool"               # Redis
-        assert respostas[1].json()["source"] == "pool"               # Redis
-        assert respostas[2].json()["source"] == "static_fallback"    # Fallback PG
-        assert respostas[3].status_code == 503                       # Load Shedding
+        assert respostas[0].json()["source"] == "pool"  # Redis
+        assert respostas[1].json()["source"] == "pool"  # Redis
+        assert respostas[2].json()["source"] == "static_fallback"  # Fallback PG
+        assert respostas[3].status_code == 503  # Load Shedding
 
 
 # Fluxo 6 — Health check
+
 
 class TestHealthCheck:
     """O endpoint /health deve estar sempre disponível."""

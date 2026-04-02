@@ -7,6 +7,7 @@ Cobre:
 - Validação de tipos e níveis
 - Tratamento de erros
 """
+
 import asyncio
 import pytest
 from src.generators.challenge_generator import (

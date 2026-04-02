@@ -1,6 +1,7 @@
 """
 Provedor de LLM usando Groq.
 """
+
 import asyncio
 import json
 import logging
@@ -56,7 +57,9 @@ class GroqLLMProvider(LLMProvider):
                 temperature=0.5,
             )
 
-            content = completion.choices[0].message.content if completion.choices else None
+            content = (
+                completion.choices[0].message.content if completion.choices else None
+            )
             if not content:
                 raise LLMError("Groq retornou resposta vazia")
 
@@ -124,8 +127,6 @@ Requisitos:
         required_keys = ["title", "description", "example_input", "example_output"]
         for key in required_keys:
             if key not in data:
-                raise json.JSONDecodeError(
-                    f"Campo obrigatório faltando: {key}", "", 0
-                )
+                raise json.JSONDecodeError(f"Campo obrigatório faltando: {key}", "", 0)
 
         return data

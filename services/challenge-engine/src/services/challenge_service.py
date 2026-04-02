@@ -4,6 +4,7 @@ Challenge Service Module
 Serviço que coordena a geração de desafios e seu envio para o Redis.
 Implementa lógica de negócio e orquestração.
 """
+
 import logging
 from typing import Optional
 
@@ -21,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 class ChallengeServiceError(Exception):
     """Erro no serviço de desafios."""
+
     pass
 
 

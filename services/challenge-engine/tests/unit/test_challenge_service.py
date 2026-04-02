@@ -7,9 +7,9 @@ Cobre:
 - Tratamento de erros
 - Integração com Redis
 """
+
 import pytest
-import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 from src.services.challenge_service import (
     ChallengeService,
@@ -52,7 +52,9 @@ class TestChallengeService:
         assert service_without_redis.generator is not None
 
     @pytest.mark.asyncio
-    async def test_generate_and_save_success(self, service_with_redis, mock_redis_client):
+    async def test_generate_and_save_success(
+        self, service_with_redis, mock_redis_client
+    ):
         """Testa geração e salvamento bem-sucedido."""
         challenge = await service_with_redis.generate_and_save()
         assert isinstance(challenge, Challenge)
@@ -60,7 +62,9 @@ class TestChallengeService:
         assert await mock_redis_client.get_pool_size() == 1
 
     @pytest.mark.asyncio
-    async def test_generate_and_save_with_type(self, service_with_redis, mock_redis_client):
+    async def test_generate_and_save_with_type(
+        self, service_with_redis, mock_redis_client
+    ):
         """Testa geração e salvamento com tipo especificado."""
         challenge = await service_with_redis.generate_and_save(
             challenge_type=ChallengeType.ALGORITHM
@@ -69,7 +73,9 @@ class TestChallengeService:
         assert await mock_redis_client.get_pool_size() == 1
 
     @pytest.mark.asyncio
-    async def test_generate_and_save_with_level(self, service_with_redis, mock_redis_client):
+    async def test_generate_and_save_with_level(
+        self, service_with_redis, mock_redis_client
+    ):
         """Testa geração e salvamento com nível especificado."""
         challenge = await service_with_redis.generate_and_save(
             challenge_type=ChallengeType.ALGORITHM, level=ChallengeLevel.EASY
@@ -85,10 +91,14 @@ class TestChallengeService:
         assert challenge.id
 
     @pytest.mark.asyncio
-    async def test_generate_and_save_redis_failure_non_blocking(self, service_with_redis):
+    async def test_generate_and_save_redis_failure_non_blocking(
+        self, service_with_redis
+    ):
         """Testa que falha no Redis não bloqueia geração."""
         failing_redis = AsyncMock()
-        failing_redis.push_challenge.side_effect = RedisConnectionError("Connection failed")
+        failing_redis.push_challenge.side_effect = RedisConnectionError(
+            "Connection failed"
+        )
 
         service_with_redis.redis_client = failing_redis
 
@@ -111,7 +121,9 @@ class TestChallengeService:
         assert await mock_redis_client.get_pool_size() == 3
 
     @pytest.mark.asyncio
-    async def test_generate_and_save_batch_large(self, service_with_redis, mock_redis_client):
+    async def test_generate_and_save_batch_large(
+        self, service_with_redis, mock_redis_client
+    ):
         """Testa geração em lote grande."""
         challenges = await service_with_redis.generate_and_save_batch(count=50)
 

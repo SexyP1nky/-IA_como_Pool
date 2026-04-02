@@ -1,6 +1,7 @@
 """
 Mock do provedor LLM para testes e fallback.
 """
+
 import logging
 from src.llm.provider import LLMProvider, LLMError
 

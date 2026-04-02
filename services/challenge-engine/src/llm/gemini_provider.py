@@ -1,6 +1,7 @@
 """
 Provedor de LLM usando Google Gemini.
 """
+
 import os
 import json
 import logging
@@ -12,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 try:
     from google import genai
+
     GEMINI_AVAILABLE = True
 except ImportError:
     GEMINI_AVAILABLE = False
@@ -131,8 +133,6 @@ Requisitos:
         required_keys = ["title", "description", "example_input", "example_output"]
         for key in required_keys:
             if key not in data:
-                raise json.JSONDecodeError(
-                    f"Campo obrigatório faltando: {key}", "", 0
-                )
+                raise json.JSONDecodeError(f"Campo obrigatório faltando: {key}", "", 0)
 
         return data

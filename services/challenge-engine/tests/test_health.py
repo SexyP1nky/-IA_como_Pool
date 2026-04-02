@@ -4,7 +4,9 @@ from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock, patch
 from src.integrations.redis import MockRedisClient
 from src.generators.challenge_generator import (
-    Challenge, ChallengeType, ChallengeLevel,
+    Challenge,
+    ChallengeType,
+    ChallengeLevel,
 )
 from src.main import app
 import src.main as main_module
@@ -25,8 +27,13 @@ client = TestClient(app)
 
 def _make_challenge(id: str = "test-1") -> Challenge:
     return Challenge(
-        id=id, type=ChallengeType.ALGORITHM, level=ChallengeLevel.EASY,
-        title="T", description="D", example_input="i", example_output="o",
+        id=id,
+        type=ChallengeType.ALGORITHM,
+        level=ChallengeLevel.EASY,
+        title="T",
+        description="D",
+        example_input="i",
+        example_output="o",
         created_at="2025-01-01",
     )
 

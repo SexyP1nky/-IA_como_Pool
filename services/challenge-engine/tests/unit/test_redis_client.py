@@ -6,6 +6,7 @@ Cobre:
 - Operações básicas (push, get)
 - Tratamento de erros
 """
+
 import pytest
 import json
 import asyncio
@@ -45,6 +46,7 @@ class TestMockRedisClient:
 
     def test_push_challenge(self, redis_client, sample_challenge):
         """Testa adição de um desafio."""
+
         async def run_test():
             result = await redis_client.push_challenge(sample_challenge)
             assert result is True
@@ -54,6 +56,7 @@ class TestMockRedisClient:
 
     def test_push_challenge_multiple(self, redis_client, sample_challenge):
         """Testa adição de múltiplos desafios."""
+
         async def run_test():
             for i in range(3):
                 challenge = sample_challenge
@@ -66,6 +69,7 @@ class TestMockRedisClient:
 
     def test_get_challenge(self, redis_client, sample_challenge):
         """Testa recuperação de um desafio."""
+
         async def run_test():
             await redis_client.push_challenge(sample_challenge)
             challenge_json = await redis_client.get_challenge()
@@ -79,6 +83,7 @@ class TestMockRedisClient:
 
     def test_get_challenge_empty(self, redis_client):
         """Testa recuperação quando storage está vazio."""
+
         async def run_test():
             result = await redis_client.get_challenge()
             assert result is None
@@ -87,6 +92,7 @@ class TestMockRedisClient:
 
     def test_push_batch(self, redis_client, sample_challenge):
         """Testa adição de lote."""
+
         async def run_test():
             challenges = [sample_challenge for _ in range(5)]
             result = await redis_client.push_challenges_batch(challenges)
@@ -98,6 +104,7 @@ class TestMockRedisClient:
 
     def test_get_pool_size(self, redis_client, sample_challenge):
         """Testa obtenção do tamanho do pool."""
+
         async def run_test():
             await redis_client.push_challenge(sample_challenge)
             size = await redis_client.get_pool_size()
@@ -108,6 +115,7 @@ class TestMockRedisClient:
 
     def test_get_pool_size_multiple(self, redis_client, sample_challenge):
         """Testa tamanho do pool com múltiplos items."""
+
         async def run_test():
             for i in range(5):
                 challenge = sample_challenge
@@ -121,6 +129,7 @@ class TestMockRedisClient:
 
     def test_close(self, redis_client, sample_challenge):
         """Testa fechamento da conexão."""
+
         async def run_test():
             await redis_client.push_challenge(sample_challenge)
             await redis_client.close()
@@ -131,6 +140,7 @@ class TestMockRedisClient:
 
     def test_fifo_order(self, redis_client):
         """Testa que entrega segue ordem FIFO."""
+
         async def run_test():
             challenges = []
             for i in range(3):

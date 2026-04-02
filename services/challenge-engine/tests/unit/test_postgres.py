@@ -1,4 +1,5 @@
 """Testes unitários de integração postgres (sem banco)."""
+
 from src.integrations.postgres import _postgres_dsn
 
 

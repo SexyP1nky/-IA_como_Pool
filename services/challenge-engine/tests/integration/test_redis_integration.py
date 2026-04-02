@@ -5,6 +5,7 @@ Requer Redis rodando (docker-compose up -d redis).
 Rodar com:  pytest tests/integration/ -v -m integration
 Pular com:  pytest -m "not integration"
 """
+
 import json
 import os
 import pytest

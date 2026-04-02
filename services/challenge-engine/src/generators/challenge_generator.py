@@ -5,6 +5,7 @@ Módulo responsável por gerar desafios de programação.
 Implementa diferentes tipos de desafios e mantém a geração modular e extensível.
 Suporta geração via LLM (Gemini, Mock) com fallback para pool pré-definido.
 """
+
 import logging
 import uuid
 import os
@@ -20,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 class ChallengeLevel(str, Enum):
     """Níveis de dificuldade dos desafios."""
+
     EASY = "easy"
     MEDIUM = "medium"
     HARD = "hard"
@@ -27,6 +29,7 @@ class ChallengeLevel(str, Enum):
 
 class ChallengeType(str, Enum):
     """Tipos de desafios disponíveis."""
+
     ALGORITHM = "algorithm"
     STRING_MANIPULATION = "string_manipulation"
     MATH = "math"
@@ -46,6 +49,7 @@ class ChallengeRecord:
 @dataclass
 class Challenge:
     """Representação de um desafio."""
+
     id: str
     type: ChallengeType
     level: ChallengeLevel
@@ -66,6 +70,7 @@ class Challenge:
 
 class ChallengeGenerationError(Exception):
     """Erro na geração de desafios."""
+
     pass
 
 
@@ -176,6 +181,7 @@ class ChallengeGenerator:
                     self.llm_provider = MockLLMProvider()
 
             from src.llm.mock_provider import MockLLMProvider
+
             self.fallback_provider = MockLLMProvider()
             self.circuit_breaker = CircuitBreaker(failure_threshold=3)
         else:
@@ -261,6 +267,7 @@ class ChallengeGenerator:
                 )
 
             import random
+
             challenge_data = random.choice(challenges)
 
             challenge = Challenge(
@@ -332,12 +339,14 @@ class ChallengeGenerator:
     def _random_type() -> ChallengeType:
         """Seleciona um tipo aleatório de desafio."""
         import random
+
         return random.choice(list(ChallengeType))
 
     @staticmethod
     def _random_level() -> ChallengeLevel:
         """Seleciona um nível aleatório de dificuldade."""
         import random
+
         return random.choice(list(ChallengeLevel))
 
     @staticmethod

@@ -3,16 +3,17 @@ Interface abstrata para provedores de LLM.
 
 Permite implementar múltiplos provedores (OpenAI, Gemini, Ollama, etc).
 """
+
 import time
 import logging
 from abc import ABC, abstractmethod
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 
 class LLMError(Exception):
     """Erro ao chamar LLM."""
+
     pass
 
 

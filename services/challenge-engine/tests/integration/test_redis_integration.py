@@ -1,9 +1,9 @@
 """
-Testes de integração com Redis real.
+Integration tests with a real Redis instance.
 
-Requer Redis rodando (docker-compose up -d redis).
-Rodar com:  pytest tests/integration/ -v -m integration
-Pular com:  pytest -m "not integration"
+Requires Redis running (docker-compose up -d redis).
+Run with:  pytest tests/integration/ -v -m integration
+Skip with: pytest -m "not integration"
 """
 
 import json
@@ -12,31 +12,25 @@ import pytest
 import pytest_asyncio
 
 from src.integrations.redis import RedisClientImpl, RedisConnectionError
-from src.generators.challenge_generator import (
-    Challenge,
-    ChallengeType,
-    ChallengeLevel,
-)
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 TEST_KEY = "test_integration_pool"
 
 
-def _make_challenge(id: str = "int-1") -> Challenge:
-    return Challenge(
-        id=id,
-        type=ChallengeType.ALGORITHM,
-        level=ChallengeLevel.EASY,
-        title="Integration Test Challenge",
-        description="Testing real Redis connection",
-        example_input="[1,2]",
-        example_output="3",
-        created_at="2026-01-01T00:00:00",
-    )
+def _make_challenge(id: str = "int-1") -> dict:
+    return {
+        "id": id,
+        "type": "algorithm",
+        "level": "easy",
+        "title": "Integration Test Challenge",
+        "description": "Testing real Redis connection",
+        "example_input": "[1,2]",
+        "example_output": "3",
+        "created_at": "2026-01-01T00:00:00",
+    }
 
 
 def _can_reach_redis() -> bool:
-    """Tenta ping no Redis para decidir se os testes devem rodar."""
     import asyncio
 
     async def _ping():
@@ -53,13 +47,12 @@ def _can_reach_redis() -> bool:
 
 skip_no_redis = pytest.mark.skipif(
     not _can_reach_redis(),
-    reason=f"Redis não acessível em {REDIS_URL} (rode: docker-compose up -d redis)",
+    reason=f"Redis not reachable at {REDIS_URL} (run: docker-compose up -d redis)",
 )
 
 
 @pytest_asyncio.fixture
 async def redis_client():
-    """Cria client conectado ao Redis real e limpa a key de teste."""
     client = RedisClientImpl.from_url(REDIS_URL, key=TEST_KEY)
     await client.connect()
     if client.redis:
@@ -141,7 +134,6 @@ async def test_pool_size_empty(redis_client):
 @skip_no_redis
 @pytest.mark.asyncio
 async def test_connection_failure():
-    """Testa que conexão com host inválido levanta RedisConnectionError."""
     client = RedisClientImpl(host="host-invalido-xyz", port=9999, key=TEST_KEY)
     with pytest.raises(RedisConnectionError):
         await client.connect()

@@ -1,165 +1,104 @@
-"""
-Testes para o cliente Redis.
+"""Tests for the MockRedisClient (FIFO queue behavior)."""
 
-Cobre:
-- Mock do cliente Redis
-- Operações básicas (push, get)
-- Tratamento de erros
-"""
-
-import pytest
 import json
 import asyncio
 from src.integrations.redis import MockRedisClient
-from src.generators.challenge_generator import (
-    Challenge,
-    ChallengeLevel,
-    ChallengeType,
-)
+
+
+SAMPLE_CHALLENGE = {
+    "id": "test-123",
+    "type": "algorithm",
+    "level": "easy",
+    "title": "Test Challenge",
+    "description": "A test challenge",
+    "example_input": "test",
+    "example_output": "test",
+    "created_at": "2024-01-01T00:00:00",
+}
 
 
 class TestMockRedisClient:
-    """Testes do mock do cliente Redis."""
+    def _make(self, **overrides):
+        return {**SAMPLE_CHALLENGE, **overrides}
 
-    @pytest.fixture
-    def redis_client(self):
-        """Fixture para criar um cliente Redis mock."""
-        return MockRedisClient()
+    def test_init(self):
+        rc = MockRedisClient()
+        assert rc.storage == []
 
-    @pytest.fixture
-    def sample_challenge(self):
-        """Fixture para criar um desafio de exemplo."""
-        return Challenge(
-            id="test-123",
-            type=ChallengeType.ALGORITHM,
-            level=ChallengeLevel.EASY,
-            title="Test Challenge",
-            description="A test challenge",
-            example_input="test",
-            example_output="test",
-            created_at="2024-01-01T00:00:00",
-        )
-
-    def test_init(self, redis_client):
-        """Testa inicialização do mock."""
-        assert redis_client.storage == []
-
-    def test_push_challenge(self, redis_client, sample_challenge):
-        """Testa adição de um desafio."""
-
-        async def run_test():
-            result = await redis_client.push_challenge(sample_challenge)
+    def test_push_challenge(self):
+        async def run():
+            rc = MockRedisClient()
+            result = await rc.push_challenge(self._make())
             assert result is True
-            assert len(redis_client.storage) == 1
+            assert len(rc.storage) == 1
 
-        asyncio.run(run_test())
+        asyncio.run(run())
 
-    def test_push_challenge_multiple(self, redis_client, sample_challenge):
-        """Testa adição de múltiplos desafios."""
-
-        async def run_test():
+    def test_push_multiple(self):
+        async def run():
+            rc = MockRedisClient()
             for i in range(3):
-                challenge = sample_challenge
-                challenge.id = f"test-{i}"
-                await redis_client.push_challenge(challenge)
+                await rc.push_challenge(self._make(id=f"test-{i}"))
+            assert len(rc.storage) == 3
 
-            assert len(redis_client.storage) == 3
+        asyncio.run(run())
 
-        asyncio.run(run_test())
-
-    def test_get_challenge(self, redis_client, sample_challenge):
-        """Testa recuperação de um desafio."""
-
-        async def run_test():
-            await redis_client.push_challenge(sample_challenge)
-            challenge_json = await redis_client.get_challenge()
-
-            assert challenge_json is not None
-            data = json.loads(challenge_json)
+    def test_get_challenge(self):
+        async def run():
+            rc = MockRedisClient()
+            await rc.push_challenge(self._make())
+            raw = await rc.get_challenge()
+            assert raw is not None
+            data = json.loads(raw)
             assert data["id"] == "test-123"
-            assert len(redis_client.storage) == 0  # Deve remover após get
+            assert len(rc.storage) == 0
 
-        asyncio.run(run_test())
+        asyncio.run(run())
 
-    def test_get_challenge_empty(self, redis_client):
-        """Testa recuperação quando storage está vazio."""
-
-        async def run_test():
-            result = await redis_client.get_challenge()
+    def test_get_challenge_empty(self):
+        async def run():
+            rc = MockRedisClient()
+            result = await rc.get_challenge()
             assert result is None
 
-        asyncio.run(run_test())
+        asyncio.run(run())
 
-    def test_push_batch(self, redis_client, sample_challenge):
-        """Testa adição de lote."""
-
-        async def run_test():
-            challenges = [sample_challenge for _ in range(5)]
-            result = await redis_client.push_challenges_batch(challenges)
-
+    def test_push_batch(self):
+        async def run():
+            rc = MockRedisClient()
+            batch = [self._make(id=f"test-{i}") for i in range(5)]
+            result = await rc.push_challenges_batch(batch)
             assert result is True
-            assert len(redis_client.storage) == 5
+            assert len(rc.storage) == 5
 
-        asyncio.run(run_test())
+        asyncio.run(run())
 
-    def test_get_pool_size(self, redis_client, sample_challenge):
-        """Testa obtenção do tamanho do pool."""
+    def test_get_pool_size(self):
+        async def run():
+            rc = MockRedisClient()
+            await rc.push_challenge(self._make())
+            assert await rc.get_pool_size() == 1
 
-        async def run_test():
-            await redis_client.push_challenge(sample_challenge)
-            size = await redis_client.get_pool_size()
+        asyncio.run(run())
 
-            assert size == 1
+    def test_close_clears_storage(self):
+        async def run():
+            rc = MockRedisClient()
+            await rc.push_challenge(self._make())
+            await rc.close()
+            assert len(rc.storage) == 0
 
-        asyncio.run(run_test())
+        asyncio.run(run())
 
-    def test_get_pool_size_multiple(self, redis_client, sample_challenge):
-        """Testa tamanho do pool com múltiplos items."""
-
-        async def run_test():
-            for i in range(5):
-                challenge = sample_challenge
-                challenge.id = f"test-{i}"
-                await redis_client.push_challenge(challenge)
-
-            size = await redis_client.get_pool_size()
-            assert size == 5
-
-        asyncio.run(run_test())
-
-    def test_close(self, redis_client, sample_challenge):
-        """Testa fechamento da conexão."""
-
-        async def run_test():
-            await redis_client.push_challenge(sample_challenge)
-            await redis_client.close()
-
-            assert len(redis_client.storage) == 0
-
-        asyncio.run(run_test())
-
-    def test_fifo_order(self, redis_client):
-        """Testa que entrega segue ordem FIFO."""
-
-        async def run_test():
-            challenges = []
+    def test_fifo_order(self):
+        async def run():
+            rc = MockRedisClient()
             for i in range(3):
-                challenge = Challenge(
-                    id=f"test-{i}",
-                    type=ChallengeType.ALGORITHM,
-                    level=ChallengeLevel.EASY,
-                    title=f"Challenge {i}",
-                    description="Test",
-                    example_input="test",
-                    example_output="test",
-                    created_at="2024-01-01",
-                )
-                challenges.append(challenge)
-                await redis_client.push_challenge(challenge)
+                await rc.push_challenge(self._make(id=f"test-{i}"))
 
             for i in range(3):
-                result = await redis_client.get_challenge()
-                data = json.loads(result)
+                raw = await rc.get_challenge()
+                data = json.loads(raw)
                 assert data["id"] == f"test-{i}"
 
-        asyncio.run(run_test())
+        asyncio.run(run())

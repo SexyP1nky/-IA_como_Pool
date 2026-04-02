@@ -33,6 +33,17 @@ class ChallengeType(str, Enum):
 
 
 @dataclass
+class ChallengeRecord:
+    """Linha da tabela PostgreSQL `challenges` (fallback estático).
+
+    Coluna `challenge`: mesma string que o Redis — JSON de `Challenge.to_dict()`.
+    """
+
+    id: int | None
+    challenge: str
+
+
+@dataclass
 class Challenge:
     """Representação de um desafio."""
     id: str

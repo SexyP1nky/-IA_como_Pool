@@ -1,12 +1,21 @@
 import asyncio
+import os
+
 import asyncpg
 
-async def run():
+
+DEFAULT_DATABASE_URL = "postgresql://127.0.0.1:5432/ai_pool"
+
+
+async def run() -> None:
+    database_url = os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL)
     try:
-        conn = await asyncpg.connect('postgresql://ai_pool_user:ai_pool_pass@127.0.0.1:5432/ai_pool', ssl=False)
+        conn = await asyncpg.connect(database_url, timeout=2.0)
         print("CONECTADO COM SUCESSO!")
         await conn.close()
     except Exception as e:
         print(f"ERRO: {e}")
 
-asyncio.run(run())
+
+if __name__ == "__main__":
+    asyncio.run(run())

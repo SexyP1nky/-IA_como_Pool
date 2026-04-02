@@ -20,6 +20,8 @@ import os
 import asyncpg
 
 logger = logging.getLogger(__name__)
+DEFAULT_CONNECT_TIMEOUT_S = 2.0
+DEFAULT_QUERY_TIMEOUT_S = 2.0
 
 
 def _postgres_dsn() -> str | None:
@@ -51,11 +53,23 @@ async def get_challenge_from_postgres() -> str | None:
     if not dsn:
         return None
 
+    connect_timeout = float(
+        os.getenv("POSTGRES_CONNECT_TIMEOUT_S", str(DEFAULT_CONNECT_TIMEOUT_S))
+    )
+    query_timeout = float(
+        os.getenv("POSTGRES_QUERY_TIMEOUT_S", str(DEFAULT_QUERY_TIMEOUT_S))
+    )
+
     try:
-        conn = await asyncpg.connect(dsn)
+        conn = await asyncpg.connect(
+            dsn,
+            timeout=connect_timeout,
+            command_timeout=query_timeout,
+        )
         try:
             row = await conn.fetchrow(
-                "SELECT challenge FROM challenges ORDER BY id ASC LIMIT 1"
+                "SELECT challenge FROM challenges ORDER BY id ASC LIMIT 1",
+                timeout=query_timeout,
             )
             return row["challenge"] if row else None
         finally:

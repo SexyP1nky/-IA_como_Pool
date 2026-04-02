@@ -15,6 +15,7 @@ from src.integrations.postgres import get_challenge_from_postgres
 DEFAULT_DATABASE_URL = (
     "postgresql+asyncpg://ai_pool_user:ai_pool_pass@localhost:5432/ai_pool"
 )
+PROBE_TIMEOUT_S = 2.0
 
 
 def _can_reach_postgres() -> bool:
@@ -25,7 +26,7 @@ def _can_reach_postgres() -> bool:
             "postgresql+asyncpg://", "postgresql://", 1
         )
         try:
-            conn = await asyncpg.connect(dsn)
+            conn = await asyncpg.connect(dsn, timeout=PROBE_TIMEOUT_S)
             await conn.close()
             return True
         except Exception:
@@ -46,8 +47,7 @@ skip_no_postgres = pytest.mark.skipif(
 @pytest.mark.integration
 @skip_no_postgres
 @pytest.mark.asyncio
-async def test_get_challenge_from_postgres_returns_json_string(monkeypatch):
-    monkeypatch.setenv("DATABASE_URL", DEFAULT_DATABASE_URL)
+async def test_get_challenge_from_postgres_returns_json_string():
     raw = await get_challenge_from_postgres()
     assert raw is not None
     data = json.loads(raw)

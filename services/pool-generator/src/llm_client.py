@@ -273,11 +273,18 @@ def generate_challenge(
             data = generate_fn(challenge_type, level)
             circuit_breaker.record_success()
         except Exception as exc:
-            logger.warning("LLM generation failed (%s): %s", provider_name, exc)
+            logger.warning(
+                "[CIRCUIT BREAKER] %s call failed: %s — falling back to mock",
+                provider_name, exc,
+            )
             circuit_breaker.record_failure()
             data = _generate_mock(challenge_type, level)
             source = "mock_fallback"
     else:
+        logger.warning(
+            "[CIRCUIT BREAKER] OPEN — skipping %s, using mock fallback",
+            provider_name,
+        )
         data = _generate_mock(challenge_type, level)
         source = "mock_fallback" if provider_name != "mock" else "mock"
 

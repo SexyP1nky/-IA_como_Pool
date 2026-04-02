@@ -18,14 +18,40 @@ import logging
 
 from celery import Celery
 from celery.schedules import timedelta
+from celery.signals import after_setup_logger
 
 from src.config import config
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
-logger = logging.getLogger(__name__)
+LOG_FMT = "[%(asctime)s] %(levelname)s | %(message)s"
+LOG_DATEFMT = "%H:%M:%S"
+
+logging.basicConfig(level=logging.INFO, format=LOG_FMT, datefmt=LOG_DATEFMT)
+
+for _noisy in (
+    "celery.worker.strategy",
+    "celery.app.trace",
+    "celery.worker.consumer",
+    "celery.worker.consumer.connection",
+    "celery.bootsteps",
+    "celery.utils.functional",
+    "celery.beat",
+    "httpx",
+    "httpcore",
+    "kombu",
+):
+    logging.getLogger(_noisy).setLevel(logging.WARNING)
+
+logger = logging.getLogger("pool-generator")
+
+
+@after_setup_logger.connect
+def _quiet_celery(sender=None, **kwargs):
+    """Keep Celery from overriding our format."""
+    celery_logger = kwargs.get("logger", sender)
+    if celery_logger:
+        for h in celery_logger.handlers:
+            h.setFormatter(logging.Formatter(LOG_FMT, datefmt=LOG_DATEFMT))
+
 
 # ---------------------------------------------------------------------------
 # Celery application
@@ -47,6 +73,7 @@ app.conf.update(
     task_default_queue="pool_tasks",
     task_default_exchange="pool_tasks",
     task_default_routing_key="pool_tasks",
+    worker_hijack_root_logger=False,
 )
 
 app.conf.beat_schedule = {
@@ -68,23 +95,23 @@ def refill_pool():
     from src import redis_client as rc
 
     current_size = rc.get_pool_size()
-    logger.info(
-        "Pool check: size=%d, min=%d, target=%d",
-        current_size,
-        config.POOL_MIN_SIZE,
-        config.POOL_TARGET_SIZE,
-    )
 
     if current_size >= config.POOL_MIN_SIZE:
         logger.info(
-            "Pool is healthy (%d >= %d), skipping refill",
+            "[POOL CHECK] size=%d/%d — healthy, no refill needed",
             current_size,
-            config.POOL_MIN_SIZE,
+            config.POOL_TARGET_SIZE,
         )
         return {"status": "ok", "pool_size": current_size, "generated": 0}
 
     deficit = config.POOL_TARGET_SIZE - current_size
-    logger.info("Pool below threshold, dispatching %d generation tasks", deficit)
+    logger.info(
+        "[POOL CHECK] size=%d/%d — BELOW minimum (%d) — dispatching %d LLM generation tasks",
+        current_size,
+        config.POOL_TARGET_SIZE,
+        config.POOL_MIN_SIZE,
+        deficit,
+    )
 
     for _ in range(deficit):
         generate_single_challenge.delay()
@@ -118,8 +145,16 @@ def generate_single_challenge(self):
 
     source = challenge.get("metadata", {}).get("source", "unknown")
     logger.info(
-        "Challenge %s generated (source=%s) and pushed to pool",
-        challenge["id"],
+        "[GENERATED] source=%-5s | type=%-20s | level=%-6s | %s\n"
+        "            desc: %s\n"
+        "            input:  %s\n"
+        "            output: %s",
         source,
+        challenge.get("type", "?"),
+        challenge.get("level", "?"),
+        challenge.get("title", "?"),
+        challenge.get("description", "?")[:140],
+        str(challenge.get("example_input", "?"))[:100],
+        str(challenge.get("example_output", "?"))[:100],
     )
     return {"id": challenge["id"], "source": source}

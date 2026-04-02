@@ -1,1 +1,0 @@
--- TODO: definir schema inicial do banco de dados

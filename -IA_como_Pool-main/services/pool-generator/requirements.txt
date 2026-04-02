@@ -1,1 +1,0 @@
-# TODO: definir dependências do pool-generator

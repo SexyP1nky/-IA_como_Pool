@@ -58,4 +58,4 @@ jobs:
           REDIS_URL: redis://localhost:6379/0
           LLM_API_URL: http://localhost:8080/v1
           LLM_API_KEY: test-key
-          DATABASE_URL: sqlite+aiosqlite:///:memory:
+          DATABASE_URL: 'sqlite+aiosqlite:///:memory:'

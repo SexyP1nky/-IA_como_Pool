@@ -258,7 +258,23 @@ pip install redis
 python scripts/validate_redis.py
 ```
 
-## 6. Parar o sistema
+## 6. Demo E2E (videocast)
+
+Para executar a demonstração completa do sistema (build, health, consumo do pool, fallback PostgreSQL, auto-refill):
+
+```bash
+./scripts/demo_videocast.sh
+```
+
+Se o stack já estiver rodando, pule o build:
+
+```bash
+./scripts/demo_videocast.sh --skip-build
+```
+
+O script avança passo a passo com pausa entre cada etapa para narração ao vivo.
+
+## 7. Parar o sistema
 
 ```bash
 docker compose down

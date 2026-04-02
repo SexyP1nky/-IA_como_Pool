@@ -14,6 +14,20 @@ Exemplo de uso futuro:
     if challenge:
         ...
 """
+import logging
+import os
+
+import asyncpg
+
+logger = logging.getLogger(__name__)
+
+
+def _postgres_dsn() -> str | None:
+    url = os.getenv("DATABASE_URL", "").strip()
+    if not url:
+        return None
+    return url.replace("postgresql+asyncpg://", "postgresql://", 1)
+
 
 async def get_challenge_from_postgres() -> str | None:
     """
@@ -33,7 +47,19 @@ async def get_challenge_from_postgres() -> str | None:
         str: desafio encontrado
         None: se não houver desafio disponível
     """
-    # TODO: implementar integração com PostgreSQL
-    # Buscar desafio: SELECT challenge FROM challenges LIMIT 1;
-    # Salvar desafio (se necessário): INSERT INTO challenges (challenge) VALUES (...);
-    return None
+    dsn = _postgres_dsn()
+    if not dsn:
+        return None
+
+    try:
+        conn = await asyncpg.connect(dsn)
+        try:
+            row = await conn.fetchrow(
+                "SELECT challenge FROM challenges ORDER BY id ASC LIMIT 1"
+            )
+            return row["challenge"] if row else None
+        finally:
+            await conn.close()
+    except Exception as e:
+        logger.warning(f"PostgreSQL fallback failed: {e}")
+        return None

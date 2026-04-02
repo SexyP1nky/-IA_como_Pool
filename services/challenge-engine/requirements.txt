@@ -5,5 +5,3 @@ asyncpg
 pytest
 pytest-asyncio
 python-dotenv
-google-genai
-groq

@@ -14,6 +14,7 @@ Exemplo de uso futuro:
     if challenge:
         ...
 """
+
 import logging
 import os
 

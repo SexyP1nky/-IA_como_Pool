@@ -4,6 +4,7 @@ Testes de integração com PostgreSQL real.
 Requer Postgres com schema (docker-compose up -d postgres) e DATABASE_URL.
 Rodar com:  pytest tests/integration/test_postgres_integration.py -v -m integration
 """
+
 import json
 import os
 

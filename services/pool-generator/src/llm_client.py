@@ -275,7 +275,8 @@ def generate_challenge(
         except Exception as exc:
             logger.warning(
                 "[CIRCUIT BREAKER] %s call failed: %s — falling back to mock",
-                provider_name, exc,
+                provider_name,
+                exc,
             )
             circuit_breaker.record_failure()
             data = _generate_mock(challenge_type, level)

@@ -91,9 +91,7 @@ class RedisClientImpl(RedisClient):
             import redis.asyncio as aioredis
 
             if self._url:
-                self.redis = aioredis.Redis.from_url(
-                    self._url, decode_responses=True
-                )
+                self.redis = aioredis.Redis.from_url(self._url, decode_responses=True)
                 label = self._url.split("@")[-1] if "@" in self._url else self._url
             else:
                 self.redis = aioredis.Redis(

@@ -43,7 +43,9 @@ async def lifespan(application: FastAPI):
         pool_size = await redis_client.get_pool_size()
         logger.info("[STARTUP] Redis connected | pool_size=%d", pool_size)
     except Exception as e:
-        logger.warning("[STARTUP] Redis unavailable (%s) — starting in degraded mode", e)
+        logger.warning(
+            "[STARTUP] Redis unavailable (%s) — starting in degraded mode", e
+        )
         redis_client = None
 
     yield

@@ -108,6 +108,13 @@ for _ in $(seq 1 40); do
   fi
   sleep 2
 done
+
+prev_size=0
+while (( pool_size != prev_size )); do
+  prev_size=$pool_size
+  sleep 3
+  pool_size=$(curl -sf "$API/health" | python3 -c "import sys,json; print(json.load(sys.stdin)['redis']['pool_size'])" 2>/dev/null || echo 0)
+done
 ok "Pool preenchido — tamanho atual: $pool_size"
 
 pause
@@ -200,6 +207,13 @@ for t in $(seq 1 20); do
     break
   fi
   sleep 2
+done
+
+prev_size=0
+while (( pool_size != prev_size )); do
+  prev_size=$pool_size
+  sleep 3
+  pool_size=$(curl -sf "$API/health" | python3 -c "import sys,json; print(json.load(sys.stdin)['redis']['pool_size'])" 2>/dev/null || echo 0)
 done
 
 echo ""

@@ -5,3 +5,5 @@ asyncpg
 pytest
 pytest-asyncio
 python-dotenv
+httpx
+pytest-cov

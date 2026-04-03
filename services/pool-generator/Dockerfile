@@ -10,6 +10,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY --chown=appuser:appuser . .
 
+RUN mkdir -p /app/data && chown appuser:appuser /app/data
+
 USER appuser
 
-CMD ["python", "-m", "src.main"]
+CMD ["celery", "-A", "src.main", "worker", "--beat", "--loglevel=info", "--concurrency=2", "-s", "/app/data/celerybeat-schedule"]

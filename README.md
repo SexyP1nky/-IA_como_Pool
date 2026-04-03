@@ -183,30 +183,119 @@ Retorna erro controlado quando sistema está sobrecarregado.
 
 ---
 
-# 9. Setup Inicial
+# 9. Como Executar
 
-## Docker Compose
+## Pré-requisitos
 
-Serviços definidos:
+- [Docker](https://docs.docker.com/get-docker/) e [Docker Compose](https://docs.docker.com/compose/) instalados
+- Python 3.11+ (apenas para rodar testes localmente)
+- Uma chave de API da **Google Gemini** ou **Groq** (opcional — sem chave o sistema usa mock)
 
-- api  
-- worker  
-- rabbitmq  
-- redis  
-- postgres  
+## 1. Configurar variáveis de ambiente
 
-Objetivo: permitir execução padronizada do sistema localmente.
+```bash
+cp .env.example .env
+```
+
+Edite o arquivo `.env` e preencha pelo menos uma chave de API:
+
+| Variável | Descrição |
+|----------|-----------|
+| `LLM_PROVIDER` | `gemini` ou `groq` |
+| `GEMINI_API_KEY` | Chave da API Google Gemini |
+| `GROQ_API_KEY` | Chave da API Groq (free tier em console.groq.com) |
+
+As demais variáveis possuem valores padrão adequados para execução local.
+
+## 2. Subir o sistema
+
+```bash
+docker compose up --build
+```
+
+Isso inicia cinco serviços: **Redis**, **RabbitMQ**, **PostgreSQL**, **pool-generator** (Celery worker) e **challenge-engine** (FastAPI).
+
+## 3. Endpoints disponíveis
+
+| Endpoint | Descrição |
+|----------|-----------|
+| `GET http://localhost:8000/health` | Health check — retorna status do Redis e tamanho do pool |
+| `GET http://localhost:8000/challenge` | Retorna um desafio do pool (Redis → fallback Postgres) |
+| `http://localhost:15672` | Dashboard RabbitMQ (usuário: `admin`, senha: `admin`) |
+
+### Exemplo de resposta — `/health`
+
+```json
+{
+  "status": "healthy",
+  "redis": {
+    "connected": true,
+    "pool_size": 42
+  }
+}
+```
+
+## 4. Rodar testes
+
+Instale as dependências de teste e execute com `pytest`:
+
+```bash
+# Challenge Engine
+pip install -r services/challenge-engine/requirements.txt
+pytest services/challenge-engine/tests/ -v
+
+# Pool Generator
+pip install -r services/pool-generator/requirements.txt
+pytest services/pool-generator/tests/ -v
+```
+
+## 5. Validar Redis
+
+Com os containers rodando, execute o script de validação para confirmar que o pool está sendo preenchido:
+
+```bash
+pip install redis
+python scripts/validate_redis.py
+```
+
+## 6. Demo E2E (videocast)
+
+Para executar a demonstração completa do sistema (build, health, consumo do pool, fallback PostgreSQL, auto-refill):
+
+```bash
+./scripts/demo_videocast.sh
+```
+
+Se o stack já estiver rodando, pule o build:
+
+```bash
+./scripts/demo_videocast.sh --skip-build
+```
+
+O script avança passo a passo com pausa entre cada etapa para narração ao vivo.
+
+## 7. Parar o sistema
+
+```bash
+docker compose down
+```
+
+Para remover também os volumes persistentes (Redis, Postgres, RabbitMQ):
+
+```bash
+docker compose down -v
+```
 
 ---
 
-## CI Básico
+## CI
 
-Pipeline inicial:
+Pipeline no GitHub Actions (`.github/workflows/ci.yml`):
 
-1. Instalar dependências  
-2. Executar lint  
-3. Rodar testes unitários  
-4. Realizar build  
+1. Instalar dependências
+2. Executar lint (`ruff check`, `ruff format --check`)
+3. Rodar testes unitários (`pytest`)
+4. Realizar build
 
 ---
 

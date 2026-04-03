@@ -1,15 +1,15 @@
-"""
-Integração com Redis para o pool de desafios.
+"""Async Redis client for the challenge pool.
 
-Usa redis-py (redis.asyncio) como cliente async.
+Uses redis-py (redis.asyncio).
+The pool-generator writes challenges as JSON strings via RPUSH;
+this client reads them via LPOP.
 """
+
 import json
 import logging
 import os
 from typing import Optional
 from abc import ABC, abstractmethod
-
-from src.generators.challenge_generator import Challenge
 
 logger = logging.getLogger(__name__)
 
@@ -20,19 +20,16 @@ DEFAULT_REDIS_DB = 0
 
 
 class RedisConnectionError(Exception):
-    """Erro de conexão com Redis."""
     pass
 
 
 class RedisClient(ABC):
-    """Interface abstrata para cliente Redis."""
-
     @abstractmethod
-    async def push_challenge(self, challenge: Challenge) -> bool:
+    async def push_challenge(self, challenge: dict) -> bool:
         pass
 
     @abstractmethod
-    async def push_challenges_batch(self, challenges: list[Challenge]) -> bool:
+    async def push_challenges_batch(self, challenges: list[dict]) -> bool:
         pass
 
     @abstractmethod
@@ -49,12 +46,11 @@ class RedisClient(ABC):
 
     @abstractmethod
     async def ping(self) -> bool:
-        """Verifica se a conexão com Redis está ativa."""
         pass
 
 
 class RedisClientImpl(RedisClient):
-    """Implementação real do cliente Redis usando redis.asyncio (redis-py)."""
+    """Production Redis client using redis.asyncio."""
 
     def __init__(
         self,
@@ -75,15 +71,10 @@ class RedisClientImpl(RedisClient):
 
     @classmethod
     def from_url(cls, url: str, key: str = DEFAULT_REDIS_KEY) -> "RedisClientImpl":
-        """Cria instância preservando a URL original (auth, rediss://, query params)."""
         return cls(key=key, url=url)
 
     @classmethod
     def from_env(cls) -> "RedisClientImpl":
-        """Cria instância a partir das variáveis de ambiente.
-
-        Prioriza REDIS_URL; se ausente, usa REDIS_HOST/PORT/DB.
-        """
         key = os.getenv("REDIS_KEY", DEFAULT_REDIS_KEY)
         url = os.getenv("REDIS_URL")
         if url:
@@ -96,14 +87,11 @@ class RedisClientImpl(RedisClient):
         )
 
     async def connect(self) -> None:
-        """Conecta ao Redis."""
         try:
             import redis.asyncio as aioredis
 
             if self._url:
-                self.redis = aioredis.Redis.from_url(
-                    self._url, decode_responses=True,
-                )
+                self.redis = aioredis.Redis.from_url(self._url, decode_responses=True)
                 label = self._url.split("@")[-1] if "@" in self._url else self._url
             else:
                 self.redis = aioredis.Redis(
@@ -115,12 +103,10 @@ class RedisClientImpl(RedisClient):
                 label = f"{self.host}:{self.port}/{self.db}"
 
             await self.redis.ping()
-            self.logger.info(f"Connected to Redis at {label}")
+            self.logger.info("Connected to Redis at %s", label)
         except Exception as e:
             self.redis = None
-            error_msg = f"Failed to connect to Redis: {e}"
-            self.logger.error(error_msg)
-            raise RedisConnectionError(error_msg) from e
+            raise RedisConnectionError(f"Failed to connect to Redis: {e}") from e
 
     async def ping(self) -> bool:
         if not self.redis:
@@ -130,25 +116,23 @@ class RedisClientImpl(RedisClient):
         except Exception:
             return False
 
-    async def push_challenge(self, challenge: Challenge) -> bool:
+    async def push_challenge(self, challenge: dict) -> bool:
         if not self.redis:
             raise RedisConnectionError("Redis not connected")
         try:
-            await self.redis.rpush(self.key, json.dumps(challenge.to_dict()))
-            self.logger.debug(f"Challenge {challenge.id} pushed to Redis")
+            await self.redis.rpush(self.key, json.dumps(challenge))
             return True
         except Exception as e:
             raise RedisConnectionError(f"Failed to push challenge: {e}") from e
 
-    async def push_challenges_batch(self, challenges: list[Challenge]) -> bool:
+    async def push_challenges_batch(self, challenges: list[dict]) -> bool:
         if not self.redis:
             raise RedisConnectionError("Redis not connected")
         try:
             pipe = self.redis.pipeline()
             for challenge in challenges:
-                pipe.rpush(self.key, json.dumps(challenge.to_dict()))
+                pipe.rpush(self.key, json.dumps(challenge))
             await pipe.execute()
-            self.logger.info(f"Batch of {len(challenges)} challenges pushed to Redis")
             return True
         except Exception as e:
             raise RedisConnectionError(f"Failed to push batch: {e}") from e
@@ -157,10 +141,7 @@ class RedisClientImpl(RedisClient):
         if not self.redis:
             raise RedisConnectionError("Redis not connected")
         try:
-            challenge = await self.redis.lpop(self.key)
-            if challenge:
-                self.logger.debug("Challenge retrieved from Redis")
-            return challenge
+            return await self.redis.lpop(self.key)
         except Exception as e:
             raise RedisConnectionError(f"Failed to get challenge: {e}") from e
 
@@ -179,18 +160,18 @@ class RedisClientImpl(RedisClient):
 
 
 class MockRedisClient(RedisClient):
-    """Mock do cliente Redis para testes."""
+    """In-memory mock for tests."""
 
     def __init__(self):
         self.storage: list[str] = []
 
-    async def push_challenge(self, challenge: Challenge) -> bool:
-        self.storage.append(json.dumps(challenge.to_dict()))
+    async def push_challenge(self, challenge: dict) -> bool:
+        self.storage.append(json.dumps(challenge))
         return True
 
-    async def push_challenges_batch(self, challenges: list[Challenge]) -> bool:
-        for challenge in challenges:
-            self.storage.append(json.dumps(challenge.to_dict()))
+    async def push_challenges_batch(self, challenges: list[dict]) -> bool:
+        for ch in challenges:
+            self.storage.append(json.dumps(ch))
         return True
 
     async def get_challenge(self) -> Optional[str]:
@@ -204,23 +185,3 @@ class MockRedisClient(RedisClient):
 
     async def close(self) -> None:
         self.storage.clear()
-
-
-async def get_challenge_from_redis(
-    host: str = DEFAULT_REDIS_HOST,
-    port: int = DEFAULT_REDIS_PORT,
-    key: str = DEFAULT_REDIS_KEY,
-) -> Optional[str]:
-    """Busca um desafio pronto no Redis (função legacy)."""
-    try:
-        client = RedisClientImpl(host=host, port=port, key=key)
-        await client.connect()
-        challenge = await client.get_challenge()
-        await client.close()
-        return challenge
-    except RedisConnectionError as e:
-        logger.warning(f"Failed to get challenge from Redis: {e}")
-        return None
-    except Exception as e:
-        logger.error(f"Unexpected error in get_challenge_from_redis: {e}")
-        return None

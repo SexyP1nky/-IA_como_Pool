@@ -11,6 +11,7 @@ Uso:
 
 Testa: ping, push, pop, batch, pool size, FIFO order, cleanup.
 """
+
 import asyncio
 import json
 import os
@@ -27,7 +28,7 @@ async def main():
 
     url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
     test_key = "validation_test_pool"
-    print(f"=== Validação Redis ===")
+    print("=== Validação Redis ===")
     print(f"URL: {url}")
     print(f"Key: {test_key}\n")
 
@@ -64,7 +65,11 @@ async def main():
         # 2) Write (RPUSH)
         print("\n2. Escrita (RPUSH)")
         try:
-            challenge = {"id": "val-1", "title": "Validation Challenge", "type": "algorithm"}
+            challenge = {
+                "id": "val-1",
+                "title": "Validation Challenge",
+                "type": "algorithm",
+            }
             await r.rpush(test_key, json.dumps(challenge))
             size = await r.llen(test_key)
             assert size == 1
@@ -136,7 +141,7 @@ async def main():
         await r.delete(test_key)
         await r.aclose()
 
-    print(f"\n{'='*40}")
+    print(f"\n{'=' * 40}")
     print(f"Resultado: {passed} passed, {failed} failed")
     if failed > 0:
         sys.exit(1)

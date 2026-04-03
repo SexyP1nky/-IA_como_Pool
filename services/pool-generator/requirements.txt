@@ -1,3 +1,5 @@
+celery[redis]==5.4.*
 redis[hiredis]
-celery
 python-dotenv
+google-genai
+groq

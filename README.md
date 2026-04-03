@@ -337,12 +337,10 @@ A arquitetura proposta atende aos requisitos da POC ao garantir:
 ---
 
 # Diagrama C4
-## Nível 1 - Contexto
-![nv1](https://github.com/user-attachments/assets/7a7d36e5-51af-4e64-8bfc-7dec88e035d0)
 
-## Nível 2 - Containers
-![nv2](https://github.com/user-attachments/assets/584ca9a2-5bfc-4218-95a1-bd4c81e4a3dd)
+- [Nível 1 — Contexto](https://github.com/user-attachments/assets/7a7d36e5-51af-4e64-8bfc-7dec88e035d0)
+- [Nível 2 — Containers](https://github.com/user-attachments/assets/584ca9a2-5bfc-4218-95a1-bd4c81e4a3dd)
 
-# LINK PARA O VÍDEO:
-## Google Drive 
-![nv3](https://drive.google.com/drive/folders/1lkM6arodZTM7yd5HpbLKcFcQ12IiD0Ng) 
+# Link para o vídeo
+
+- [Google Drive](https://drive.google.com/drive/folders/1lkM6arodZTM7yd5HpbLKcFcQ12IiD0Ng)
